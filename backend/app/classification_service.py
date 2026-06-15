@@ -24,6 +24,7 @@ from . import ocr_service
 SOLID_CONFIDENCE = 0.75
 
 _SUBJECT_GRADE_RE = [re.compile(src, re.IGNORECASE) for src in rules.SUBJECT_GRADE_REGEXES]
+_OTHER_DOCTYPE_RE = [re.compile(src, re.IGNORECASE) for src in rules.OTHER_DOCTYPE_REGEXES]
 
 
 def _norm(text: str) -> str:
@@ -53,6 +54,9 @@ def classify_text(text: str) -> PageVerdict:
     grade_hits = [r.pattern[:24] + "…" for r in _SUBJECT_GRADE_RE if r.search(t)]
     letter_hits = _hits(t, rules.LETTER_SIGNALS)
     legal_hits = _hits(t, rules.LEGALISATION_SIGNALS)
+    doctype_hits = _hits(t, rules.OTHER_DOCUMENT_TYPES) + [
+        "passport-mrz" for r in _OTHER_DOCTYPE_RE if r.search(t)
+    ]
 
     academic_strong = (
         bool(title_hits)
@@ -63,6 +67,12 @@ def classify_text(text: str) -> PageVerdict:
 
     def sig(prefix: str, items: list[str]) -> list[str]:
         return [f"{prefix}:{i}" for i in items]
+
+    # §6 step 1 — the page IS a non-academic document type (POA, passport, apostille,
+    # affidavit…). Decisive, ahead of academic signals, so an incidental "diploma" mention
+    # inside a Power of Attorney cannot flip it to academic.
+    if doctype_hits:
+        return PageVerdict("other", 0.9, True, sig("doctype", doctype_hits))
 
     # §6 step 2 — a letter (no self-title) is other even if it shows grades.
     if letter_hits and not title_hits:
@@ -106,6 +116,10 @@ def bg_crosscheck(text: str) -> bool | None:
     if len(text.strip()) < 3:
         return None
     t = _norm(text)
+    # Tier-1: a Bulgarian POA/passport/apostille is non-academic even if it mentions
+    # "диплома"/"образование" in the body.
+    if any(term in t for term in rules.BG_OTHER_DOCTYPES):
+        return False
     academic = any(term in t for term in rules.BG_ACADEMIC_LEXICON)
     legal = any(term in t for term in rules.BG_LEGALISATION_LEXICON)
     if academic and not legal:

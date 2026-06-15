@@ -111,25 +111,42 @@ LETTER_SIGNALS: list[str] = [
     "please accept this letter",
 ]
 
-# Legalisation / identity / admin artefacts (guide §4 / §5.2 / §6 step 1) -> other.
-LEGALISATION_SIGNALS: list[str] = [
+# TIER 1 — document-type identity markers (guide §6 step 1). If a page IS one of these
+# document types it is DECISIVELY `other`, even if it incidentally mentions a qualification
+# (e.g. a Power of Attorney that talks about a "high school diploma"). These never appear on
+# a genuine academic certificate, so they outrank academic signals.
+OTHER_DOCUMENT_TYPES: list[str] = [
+    "power of attorney",
+    "passport",
+    "passeport",
+    "identity card",
+    "national identity",
     "apostille",
     "convention de la haye",
     "hague convention",
+    "affidavit",
+    "statutory declaration",
+    "deed poll",
+    "tenancy agreement",
+    "application form",
+    "payment receipt",
+]
+# Passport machine-readable-zone prefix (e.g. "P<GBR..."), a reliable passport marker.
+OTHER_DOCTYPE_REGEXES: list[str] = [r"\bp<[a-z]{3}"]
+
+# TIER 2 — legalisation phrases that may co-occur ON an academic page (e.g. a translator's
+# stamp on a certified translation, guide §3.4). These mark `other` only when there is no
+# strong academic signal, so they don't override a real certificate.
+LEGALISATION_SIGNALS: list[str] = [
     "i certify this to be a true copy",
     "certified to be a true copy",
     "true and accurate translation",
     "certify that this is a true",
     "notary public",
     "notarial",
-    "solicitor",
     "commissioner for oaths",
     "embassy",
     "consular",
-    "power of attorney",
-    "affidavit",
-    "passport",
-    "identity card",
 ]
 
 # --- Bulgarian cross-check lexicon (offline verification only, guide §3.4 / §6.4) ---
@@ -151,12 +168,19 @@ BG_ACADEMIC_LEXICON: list[str] = [
     "магистър",         # master
 ]
 
+# Bulgarian TIER-1 document-type markers — decisively non-academic in the cross-check, even
+# when the page also contains academic-sounding words (e.g. a ПЪЛНОМОЩНО that mentions
+# "диплома"/"образование"). Mirrors the English OTHER_DOCUMENT_TYPES.
+BG_OTHER_DOCTYPES: list[str] = [
+    "пълномощно",          # power of attorney
+    "паспорт",             # passport
+    "апостил",             # apostille
+    "клетвена деклараци",  # affidavit / sworn declaration
+]
+
 # Bulgarian legalisation terms -> other (so a notary/apostille translation isn't misread).
 BG_LEGALISATION_LEXICON: list[str] = [
-    "апостил",          # apostille
     "нотариус",         # notary
-    "пълномощно",       # power of attorney
-    "клетвена деклараци",  # affidavit / sworn declaration
     "заверен",          # certified
     "превод",           # translation (translator's certification page)
 ]

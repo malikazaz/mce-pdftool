@@ -62,6 +62,24 @@ def test_eligibility_letter_is_other():
     assert v.label == "other"
 
 
+def test_power_of_attorney_is_other_despite_diploma_mention():
+    # Real-world regression: a POA that mentions "high school diploma" must stay OTHER.
+    text = (
+        "POWER OF ATTORNEY. APPOINTS the following persons. Represent the Student before "
+        "the Ministry of Education in Bulgaria with regards to obtaining a certificate of "
+        "equivalence of high school diploma and any other documents required for admission."
+    )
+    v = classify_text(text)
+    assert v.label == "other" and v.decisive
+
+
+def test_passport_is_other():
+    v = classify_text(
+        "PASSPORT PASSEPORT UNITED KINGDOM OF GREAT BRITAIN P<GBRHUSSAIN<<HAROON"
+    )
+    assert v.label == "other" and v.decisive
+
+
 def test_apostille_page_is_other():
     v = classify_text("APOSTILLE. Convention de la Haye du 5 octobre 1961.")
     assert v.label == "other" and v.decisive
@@ -93,6 +111,15 @@ def test_bg_crosscheck_detects_academic():
 
 def test_bg_crosscheck_detects_non_academic():
     assert cs.bg_crosscheck("Пълномощно и нотариус") is False
+
+
+def test_bg_crosscheck_poa_with_diploma_words_is_non_academic():
+    # BG POA mentions диплома/образование but is a пълномощно -> must be non-academic.
+    text = (
+        "ПЪЛНОМОЩНО НАЗНАЧАВА удостоверение за приравняване на дипломата за средно "
+        "образование"
+    )
+    assert cs.bg_crosscheck(text) is False
 
 
 def test_bg_crosscheck_inconclusive_on_empty():
