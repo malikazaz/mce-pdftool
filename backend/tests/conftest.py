@@ -32,6 +32,30 @@ def page_marker(reader: PdfReader, index_0based: int) -> str:
     return reader.pages[index_0based].extract_text().strip()
 
 
+def make_text_pdf(path: Path, pages: list[str]) -> None:
+    """Create a PDF with one page per string, embedding that string as real text.
+
+    Wraps long text across lines so the classifier's embedded-text path sees full content
+    (no OCR required in tests)."""
+    c = canvas.Canvas(str(path), pagesize=A4)
+    for body in pages:
+        c.setFont("Helvetica", 12)
+        y = 760
+        for line in body.split("\n"):
+            words, current = line.split(" "), ""
+            for w in words:
+                if len(current) + len(w) > 90:
+                    c.drawString(60, y, current)
+                    y -= 16
+                    current = w
+                else:
+                    current = f"{current} {w}".strip()
+            c.drawString(60, y, current)
+            y -= 16
+        c.showPage()
+    c.save()
+
+
 @pytest.fixture
 def sample_pdfs(tmp_path: Path) -> dict[str, Path]:
     """A realistic pair.

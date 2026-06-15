@@ -6,9 +6,12 @@ import PageZoomModal from "./components/PageZoomModal";
 import GeneratePanel from "./components/GeneratePanel";
 import { ROLE_META, ROLE_ORDER } from "./roles";
 import { defaultRolesFor } from "./payload";
-import type { Classification, Kind, Role } from "./types/pdf";
+import type { Classification, Kind, Role, SuggestionMeta } from "./types/pdf";
 
 const emptyClassification = (): Classification => ({ original: {}, translated: {} });
+const emptyMeta = (): SuggestionMeta => ({ original: {}, translated: {} });
+
+type ClassifyState = "idle" | "running" | "done" | "unavailable";
 
 export default function App() {
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -17,6 +20,9 @@ export default function App() {
     translated: null,
   });
   const [classification, setClassification] = useState<Classification>(emptyClassification());
+  const [suggestionMeta, setSuggestionMeta] = useState<SuggestionMeta>(emptyMeta());
+  const [classifyState, setClassifyState] = useState<ClassifyState>("idle");
+  const [classifyNote, setClassifyNote] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState<{ kind: Kind; page: number } | null>(null);
@@ -37,17 +43,71 @@ export default function App() {
     setError(null);
   };
 
+  const ready = pageCounts.original !== null && pageCounts.translated !== null;
+
+  // Once both PDFs are present, auto-suggest academic/other labels (local OCR + rules).
+  // Re-runs if either file is replaced (page count changes).
+  useEffect(() => {
+    if (!projectId || pageCounts.original === null || pageCounts.translated === null) return;
+    let cancelled = false;
+    setClassifyState("running");
+    setClassifyNote(null);
+    api
+      .classify(projectId)
+      .then((res) => {
+        if (cancelled) return;
+        if (!res.ocr_available) {
+          setClassifyState("unavailable");
+          setClassifyNote(res.note);
+          return;
+        }
+        // Merge suggestions over the legal-page defaults (suggestions never touch them).
+        setClassification((c) => {
+          const next: Classification = {
+            original: { ...c.original },
+            translated: { ...c.translated },
+          };
+          for (const s of res.suggestions) next[s.kind][s.page] = s.suggested_role;
+          return next;
+        });
+        const meta = emptyMeta();
+        for (const s of res.suggestions) {
+          meta[s.kind][s.page] = { needsReview: s.needs_review, confidence: s.confidence };
+        }
+        setSuggestionMeta(meta);
+        setClassifyState("done");
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setClassifyState("idle");
+        setError((e as Error).message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, pageCounts.original, pageCounts.translated]);
+
   const handleRole = (kind: Kind, page: number, role: Role) => {
     setClassification((c) => ({
       ...c,
       [kind]: { ...c[kind], [page]: role },
     }));
+    // A manual choice resolves any "needs review" flag on that page.
+    setSuggestionMeta((m) => {
+      if (!m[kind][page]) return m;
+      const next = { ...m, [kind]: { ...m[kind] } };
+      delete next[kind][page];
+      return next;
+    });
   };
 
   const resetProject = async () => {
     setProjectId(null);
     setPageCounts({ original: null, translated: null });
     setClassification(emptyClassification());
+    setSuggestionMeta(emptyMeta());
+    setClassifyState("idle");
+    setClassifyNote(null);
     setWarning(null);
     setResultKey((k) => k + 1);
     const p = await api.createProject();
@@ -56,8 +116,6 @@ export default function App() {
 
   // Force GeneratePanel to remount (clear its local form state) after a reset.
   const [resultKey, setResultKey] = useState(0);
-
-  const ready = pageCounts.original !== null && pageCounts.translated !== null;
 
   return (
     <>
@@ -86,12 +144,27 @@ export default function App() {
 
             {ready && (
               <section className="panel">
-                <h2>2. Label every page</h2>
+                <h2>2. Review page labels</h2>
                 <p className="muted" style={{ marginTop: 0 }}>
                   Solicitor (page 1), apostille (page 2) and the translated notary (last
-                  page) were applied automatically — adjust if needed. Label the remaining
-                  pages as <strong>Academic</strong> or <strong>Other</strong>.
+                  page) are applied automatically. Document pages are auto-detected as{" "}
+                  <strong>Academic</strong> or <strong>Other</strong> — please review.
                 </p>
+
+                {classifyState === "running" && (
+                  <div className="warning">Detecting academic documents…</div>
+                )}
+                {classifyState === "done" && (
+                  <div className="warning">
+                    Academic pages were auto-detected from the document text.{" "}
+                    <strong>Please review the highlighted pages</strong> before generating —
+                    every label can be changed below.
+                  </div>
+                )}
+                {classifyState === "unavailable" && classifyNote && (
+                  <div className="warning">{classifyNote}</div>
+                )}
+
                 <div className="legend">
                   {ROLE_ORDER.map((r) => (
                     <span key={r}>
@@ -107,6 +180,7 @@ export default function App() {
                     kind="original"
                     pageCount={pageCounts.original!}
                     classification={classification}
+                    suggestionMeta={suggestionMeta}
                     onChange={handleRole}
                     onZoom={(kind, page) => setZoom({ kind, page })}
                   />
@@ -115,6 +189,7 @@ export default function App() {
                     kind="translated"
                     pageCount={pageCounts.translated!}
                     classification={classification}
+                    suggestionMeta={suggestionMeta}
                     onChange={handleRole}
                     onZoom={(kind, page) => setZoom({ kind, page })}
                   />

@@ -126,6 +126,19 @@ main {
   overflow: hidden;
   background: #fff;
 }
+.thumb.needs-review {
+  box-shadow: 0 0 0 2px #fcd34d;
+}
+.suggested-tag {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
 .thumb img {
   width: 100%;
   display: block;

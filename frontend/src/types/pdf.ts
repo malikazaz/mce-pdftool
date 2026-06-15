@@ -53,3 +53,27 @@ export interface GeneratePayload {
 
 // Classification map: per kind, page number (1-based) -> role.
 export type Classification = Record<Kind, Record<number, Role>>;
+
+// --- Auto-classification (local OCR + rules) ---
+
+export interface PageSuggestion {
+  kind: Kind;
+  page: number;
+  suggested_role: "academic" | "other";
+  confidence: number;
+  needs_review: boolean;
+  signals: string[];
+}
+
+export interface ClassifyResponse {
+  ocr_available: boolean;
+  suggestions: PageSuggestion[];
+  note: string | null;
+}
+
+// Per-page metadata about a suggestion, so the UI can flag pages to review.
+export interface SuggestionInfo {
+  needsReview: boolean;
+  confidence: number;
+}
+export type SuggestionMeta = Record<Kind, Record<number, SuggestionInfo>>;

@@ -34,6 +34,15 @@ class Settings(BaseSettings):
     # Width (px) of rendered page thumbnails. Height scales to preserve aspect.
     thumbnail_width: int = 240
 
+    # --- Auto-classification (local OCR) ---
+    # Optional explicit path to the Tesseract binary (e.g. on Windows:
+    # "C:/Program Files/Tesseract-OCR/tesseract.exe"). Empty = rely on PATH.
+    tesseract_cmd: str = ""
+    # DPI used when rendering a page to an image for OCR. Higher = slower, more accurate.
+    ocr_dpi: int = 200
+    # Below this many extracted characters a page is treated as "needs OCR".
+    ocr_text_threshold: int = 20
+
     # CORS origins allowed to call the API (the Vite dev server by default).
     allowed_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 

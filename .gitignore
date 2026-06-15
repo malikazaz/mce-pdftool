@@ -20,3 +20,7 @@ frontend/tsconfig.tsbuildinfo
 .idea/
 .DS_Store
 Thumbs.db
+*.code-workspace
+
+# Internal handover / business guidance — keep out of the public repo
+pdf-page-classifier-handover/

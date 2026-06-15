@@ -32,6 +32,22 @@ class GenerateResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class PageSuggestion(BaseModel):
+    kind: str  # "original" | "translated"
+    page: int  # 1-based
+    suggested_role: str  # "academic" | "other"
+    confidence: float
+    needs_review: bool
+    signals: list[str] = Field(default_factory=list)
+
+
+class ClassifyResponse(BaseModel):
+    # False when Tesseract is unavailable; the UI then shows a note and keeps manual labelling.
+    ocr_available: bool
+    suggestions: list[PageSuggestion] = Field(default_factory=list)
+    note: str | None = None
+
+
 # --- Generate request --------------------------------------------------------
 
 

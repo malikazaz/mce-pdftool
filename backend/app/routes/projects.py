@@ -17,12 +17,21 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 
-from .. import db, pdf_service, storage_service, zip_service
+from .. import (
+    classification_service,
+    db,
+    ocr_service,
+    pdf_service,
+    storage_service,
+    zip_service,
+)
 from ..config import get_settings
 from ..models import (
+    ClassifyResponse,
     GenerateRequest,
     GenerateResponse,
     OutputSummary,
+    PageSuggestion,
     ProjectCreatedResponse,
     UploadResponse,
 )
@@ -148,6 +157,43 @@ def pdf_file(project_id: str, kind: Kind) -> FileResponse:
     if not path or not Path(path).exists():
         raise HTTPException(status_code=404, detail=f"No {kind} PDF uploaded yet.")
     return FileResponse(path, media_type="application/pdf")
+
+
+@router.post("/{project_id}/classify", response_model=ClassifyResponse)
+def classify(project_id: str) -> ClassifyResponse:
+    """Suggest academic/other labels for document pages (local OCR + rules).
+
+    Suggestions are advisory — the user confirms/overrides them before generating. The fixed
+    legal pages (solicitor/apostille/notary) are never included here. Extracted text is used
+    in-memory only and never logged or stored.
+
+    PORTAL-AUTH: gate behind the portal's auth dependency like the other routes.
+    """
+    project = _require_project(project_id)
+    original_path = project["original_pdf_path"]
+    translated_path = project["translated_pdf_path"]
+    if not original_path or not translated_path:
+        raise HTTPException(
+            status_code=400, detail="Both original and translated PDFs must be uploaded."
+        )
+
+    if not ocr_service.tesseract_available():
+        return ClassifyResponse(
+            ocr_available=False,
+            note="OCR is not available on the server, so pages cannot be auto-labelled. "
+            "Please label the document pages manually.",
+        )
+
+    results = classification_service.classify_project(
+        original_path=original_path,
+        translated_path=translated_path,
+        original_count=project["original_page_count"],
+        translated_count=project["translated_page_count"],
+    )
+    return ClassifyResponse(
+        ocr_available=True,
+        suggestions=[PageSuggestion(**vars(r)) for r in results],
+    )
 
 
 @router.post("/{project_id}/generate", response_model=GenerateResponse)

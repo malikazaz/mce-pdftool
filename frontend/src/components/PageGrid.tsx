@@ -1,12 +1,13 @@
 import { api } from "../api/client";
 import { ROLE_META, ROLE_ORDER } from "../roles";
-import type { Classification, Kind, Role } from "../types/pdf";
+import type { Classification, Kind, Role, SuggestionMeta } from "../types/pdf";
 
 interface Props {
   projectId: string;
   kind: Kind;
   pageCount: number;
   classification: Classification;
+  suggestionMeta: SuggestionMeta;
   onChange: (kind: Kind, page: number, role: Role) => void;
   onZoom: (kind: Kind, page: number) => void;
 }
@@ -16,6 +17,7 @@ export default function PageGrid({
   kind,
   pageCount,
   classification,
+  suggestionMeta,
   onChange,
   onZoom,
 }: Props) {
@@ -31,11 +33,21 @@ export default function PageGrid({
         {pages.map((page) => {
           const role = classification[kind][page] ?? "unassigned";
           const meta = ROLE_META[role];
+          const suggestion = suggestionMeta[kind][page];
+          const review = suggestion?.needsReview ?? false;
           return (
-            <div className="thumb" key={page} style={{ borderColor: meta.color }}>
+            <div
+              className={`thumb${review ? " needs-review" : ""}`}
+              key={page}
+              style={{ borderColor: review ? "#d97706" : meta.color }}
+            >
               <div className="thumb-head">
                 <span>Page {page}</span>
-                <span className="badge" style={{ background: meta.color }} />
+                {suggestion ? (
+                  <span className="suggested-tag">{review ? "review" : "auto"}</span>
+                ) : (
+                  <span className="badge" style={{ background: meta.color }} />
+                )}
               </div>
               <img
                 src={api.thumbnailUrl(projectId, kind, page)}

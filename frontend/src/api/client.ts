@@ -1,4 +1,5 @@
 import type {
+  ClassifyResponse,
   GeneratePayload,
   GenerateResponse,
   Kind,
@@ -44,6 +45,10 @@ export const api = {
 
   fileUrl(projectId: string, kind: Kind): string {
     return `${BASE}/${projectId}/pdf/${kind}/file`;
+  },
+
+  async classify(projectId: string): Promise<ClassifyResponse> {
+    return asJson(await fetch(`${BASE}/${projectId}/classify`, { method: "POST" }));
   },
 
   async generate(projectId: string, payload: GeneratePayload): Promise<GenerateResponse> {
