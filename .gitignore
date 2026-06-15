@@ -24,3 +24,6 @@ Thumbs.db
 
 # Internal handover / business guidance — keep out of the public repo
 pdf-page-classifier-handover/
+
+# Local-only working notes for Claude — never push
+/CLAUDE.md
