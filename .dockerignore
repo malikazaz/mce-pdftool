@@ -1,0 +1,11 @@
+# Keep the build context (and image) small and free of secrets/PII.
+.git
+**/__pycache__
+**/*.pyc
+backend/.venv
+backend/data
+frontend/node_modules
+frontend/dist
+frontend/tsconfig.tsbuildinfo
+pdf-page-classifier-handover
+*.code-workspace

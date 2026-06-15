@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     # CORS origins allowed to call the API (the Vite dev server by default).
     allowed_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
+    # Directory of the built frontend (Vite `dist`). When set and present, the API also
+    # serves the SPA from the same origin — the single-service production deploy. Empty in
+    # dev/tests, where the Vite dev server handles the UI.
+    static_dir: str = ""
+
     @property
     def max_upload_bytes(self) -> int:
         return self.max_upload_mb * 1024 * 1024

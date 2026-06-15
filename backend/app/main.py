@@ -14,9 +14,11 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from . import db
 from .cleanup import cleanup_loop, cleanup_old_projects
@@ -57,6 +59,12 @@ def create_app() -> FastAPI:
     @app.get("/api/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    # Single-service production deploy: serve the built frontend from the same origin so the
+    # SPA's relative /api calls work without CORS. Mounted last so /api/* routes win; only
+    # active when MCE_STATIC_DIR points at an existing Vite build (never in dev/tests).
+    if settings.static_dir and Path(settings.static_dir).is_dir():
+        app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="static")
 
     return app
 

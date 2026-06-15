@@ -1,0 +1,14 @@
+# Render Blueprint — one free, Dockerized web service that serves both the API and
+# the built frontend. In the Render dashboard: New + > Blueprint, point it at this repo.
+services:
+  - type: web
+    name: mce-pdftool
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # Lower to 200 if the free instance runs out of memory on large scans.
+      - key: MCE_OCR_DPI
+        value: "300"

@@ -113,6 +113,36 @@ automatically. To stop the app, press `Ctrl+C` in each terminal.
 > `brew install tesseract tesseract-lang` (macOS); it's normally on `PATH`, so the
 > `MCE_TESSERACT_CMD` line isn't needed.
 
+## Deploying to Render (single Docker web service)
+
+The repo ships a `Dockerfile` and `render.yaml` that build **one** service: FastAPI serves
+the `/api` **and** the built React frontend from the same origin (the SPA uses relative
+`/api` paths, so there's no CORS or API-base config). The image installs **Tesseract +
+English/Bulgarian** language packs, which a plain Python runtime can't.
+
+**Steps:**
+1. Push to GitHub (already done for this repo).
+2. In Render: **New + → Blueprint**, select this repo. Render reads `render.yaml` and creates
+   a free Docker web service. (Or **New + → Web Service**, pick the repo, choose **Docker** and
+   the **Free** plan — Render auto-detects the `Dockerfile`.)
+3. Deploy. The build takes a few minutes (it compiles the frontend and installs Tesseract).
+   When live you get a public `https://<name>.onrender.com` URL.
+
+**Free-tier notes:**
+- The service **spins down after ~15 min idle**; the next request cold-starts in ~30–60s.
+- The disk is **ephemeral** — uploads/SQLite are wiped on each deploy/restart. Fine here: the
+  flow is upload → generate → download → clear, and projects auto-clean anyway.
+- 512 MB RAM. If OCR OOMs on large scans, set `MCE_OCR_DPI=200` (env var in the dashboard).
+- **No authentication** and a **public URL** — for student PII, demo with dummy/redacted
+  documents, or put the service behind an auth gate before sharing widely.
+
+Run the image locally the same way Render does:
+
+```powershell
+docker build -t mce-pdftool .
+docker run -p 8000:8000 mce-pdftool   # open http://localhost:8000
+```
+
 ## Running the tests
 
 In **Terminal 1** (with the venv activated):
