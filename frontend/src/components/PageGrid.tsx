@@ -44,7 +44,9 @@ export default function PageGrid({
               <div className="thumb-head">
                 <span>Page {page}</span>
                 {suggestion ? (
-                  <span className="suggested-tag">{review ? "review" : "auto"}</span>
+                  <span className={`suggested-tag${review ? "" : " auto"}`}>
+                    {review ? "review" : "auto"}
+                  </span>
                 ) : (
                   <span className="badge" style={{ background: meta.color }} />
                 )}

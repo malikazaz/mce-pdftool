@@ -119,14 +119,6 @@ export default function App() {
 
   return (
     <>
-      <header className="app-header">
-        <h1>MedConnect Europe — PDF Assembly Tool</h1>
-        <p>
-          Deterministic, manual page labelling. No AI, no external processing — files stay on
-          this server and are cleared on demand.
-        </p>
-      </header>
-
       <main>
         {error && <div className="error">{error}</div>}
         {!projectId && <p className="muted">Starting a new project…</p>}
@@ -152,10 +144,10 @@ export default function App() {
                 </p>
 
                 {classifyState === "running" && (
-                  <div className="warning">Detecting academic documents…</div>
+                  <div className="info">Detecting academic documents…</div>
                 )}
                 {classifyState === "done" && (
-                  <div className="warning">
+                  <div className="info">
                     Academic pages were auto-detected from the document text.{" "}
                     <strong>Please review the highlighted pages</strong> before generating —
                     every label can be changed below.
