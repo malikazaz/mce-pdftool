@@ -147,6 +147,15 @@ After both PDFs are uploaded, the tool suggests which document pages are **acade
 **other** (letters, identity/legal/admin pages). This is **always a suggestion the staff
 member confirms** — never a final decision.
 
+The academic lexicon is **international**, not just UK: alongside GCSE/IGCSE/GCE A-Level it
+recognises secondary-school equivalents and exam boards from South Asia (Matriculation,
+Intermediate, CBSE/ICSE, BISE/FBISE, Class X/XII mark sheets, divisions/CGPA),
+Africa (WAEC/NECO/KNEC, National/Senior Senior School Certificate, Umalusi),
+the Middle East (Tawjihi, Thanaweya Amma), and Europe/North America (Abitur, Baccalauréat,
+Bachillerato, Maturità, High School Diploma/Transcript), plus tertiary qualifications
+(Bachelor/Master/Doctorate, HND, foundation/associate/postgraduate diplomas). Civil-registry
+certificates (birth/marriage/etc.) are explicitly kept out of "academic".
+
 How it works (no AI, no external APIs — fully offline, GDPR-friendly for student data):
 
 - **Local OCR** extracts page text — the PDF's embedded text layer first, then **Tesseract**
@@ -184,7 +193,7 @@ Settings are environment-overridable with the `MCE_` prefix (see `backend/app/co
 | `MCE_CLEANUP_INTERVAL_MINUTES` | `60` | How often the cleanup task runs |
 | `MCE_THUMBNAIL_WIDTH` | `240` | Thumbnail render width (px) |
 | `MCE_TESSERACT_CMD` | _(empty)_ | Explicit path to the Tesseract binary (else use `PATH`) |
-| `MCE_OCR_DPI` | `200` | Render DPI when OCR'ing a scanned page |
+| `MCE_OCR_DPI` | `300` | Render DPI when OCR'ing a scanned page (higher = better on faint scans, slower) |
 | `MCE_OCR_TEXT_THRESHOLD` | `20` | Below this many embedded chars, a page is OCR'd |
 | `MCE_ALLOWED_ORIGINS` | localhost:5173 | CORS origins (JSON list) |
 

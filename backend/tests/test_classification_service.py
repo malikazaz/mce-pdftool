@@ -95,6 +95,82 @@ def test_unknown_page_defaults_to_other_and_flags_review():
     assert v.label == "other" and not v.decisive
 
 
+def test_edexcel_gcse_acronym_numeric_grade_is_academic():
+    # Real-world regression (Ayaan set, English p6): a sparse GCSE certificate whose only
+    # title is the acronym "GCSE", whose grade is numeric ("GRADE 8"), plus a subject code.
+    # None of the spelled-out title / letter-grade signals fire, so it used to fall through
+    # to default-other. Acronym title + awarding body + numeric grade/code must make academic.
+    text = (
+        "Pearson Edexcel GCSE. GCSE (One Subject): MATHEMATICS GRADE 8 (eight) 601/4700/3"
+    )
+    v = classify_text(text)
+    assert v.label == "academic" and v.decisive
+
+
+def test_gce_acronym_is_academic():
+    v = classify_text("Pearson Edexcel GCE. Advanced Level (Two Subjects).")
+    assert v.label == "academic" and v.decisive
+
+
+def test_eligibility_letter_mentioning_a_levels_stays_other():
+    # Guard: "A levels" appears in eligibility LETTERS — adding it as an academic title would
+    # wrongly flip the letter. It must remain decisively other on its letter structure.
+    text = (
+        "To Whom it May Concern. This is to confirm that the student has completed his "
+        "A levels at this school and is eligible to apply. Yours sincerely."
+    )
+    v = classify_text(text)
+    assert v.label == "other" and v.decisive
+
+
+def test_pakistani_intermediate_certificate_is_academic():
+    v = classify_text(
+        "Board of Intermediate and Secondary Education, Lahore. Intermediate Certificate. "
+        "Roll No. 123456. Has passed the examination."
+    )
+    assert v.label == "academic" and v.decisive
+
+
+def test_south_african_national_senior_certificate_is_academic():
+    v = classify_text(
+        "National Senior Certificate. Umalusi. This is to certify that the candidate "
+        "achieved the following results."
+    )
+    assert v.label == "academic" and v.decisive
+
+
+def test_indian_mark_sheet_with_division_is_academic():
+    v = classify_text(
+        "Central Board of Secondary Education. Consolidated Mark Sheet. Class XII. "
+        "Roll Number 7788. First Division. CGPA 9.2"
+    )
+    assert v.label == "academic" and v.decisive
+
+
+def test_degree_conferred_language_is_academic():
+    v = classify_text(
+        "The degree of Bachelor of Science is hereby conferred upon the candidate "
+        "having satisfied all requirements."
+    )
+    assert v.label == "academic"
+
+
+def test_waec_result_statement_is_academic():
+    v = classify_text(
+        "West African Examinations Council. West African Senior School Certificate. "
+        "Candidate Number 9001. English Language: B3 Mathematics: A1"
+    )
+    assert v.label == "academic" and v.decisive
+
+
+def test_birth_certificate_is_other_not_academic():
+    # A civil-registry certificate must not be mistaken for an academic certificate.
+    v = classify_text(
+        "Birth Certificate. This is to certify that the birth was registered."
+    )
+    assert v.label == "other" and v.decisive
+
+
 def test_certified_translation_of_certificate_stays_academic():
     # §3.4 — academic title wins even when a translator stamp is present on the page.
     v = classify_text(

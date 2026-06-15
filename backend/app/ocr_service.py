@@ -20,7 +20,7 @@ from pathlib import Path
 
 import fitz  # PyMuPDF
 import pytesseract
-from PIL import Image
+from PIL import Image, ImageOps
 
 from .config import get_settings
 
@@ -79,6 +79,10 @@ def _ocr_page(page: "fitz.Page", lang: str) -> str:
         dpi = get_settings().ocr_dpi
         pix = page.get_pixmap(matrix=fitz.Matrix(dpi / 72, dpi / 72))
         img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+        # Faint, low-contrast scans (e.g. certificates with a tinted background) OCR poorly
+        # in colour. Grayscale + autocontrast stretches the tonal range so light text on a
+        # tinted ground is legible to Tesseract — no thresholding (which can erase fine print).
+        img = ImageOps.autocontrast(img.convert("L"))
         return pytesseract.image_to_string(img, lang=use_lang).strip()
     except Exception:
         return ""

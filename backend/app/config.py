@@ -39,7 +39,8 @@ class Settings(BaseSettings):
     # "C:/Program Files/Tesseract-OCR/tesseract.exe"). Empty = rely on PATH.
     tesseract_cmd: str = ""
     # DPI used when rendering a page to an image for OCR. Higher = slower, more accurate.
-    ocr_dpi: int = 200
+    # 300 reads faint/low-contrast certificate scans far better than 200, at a modest cost.
+    ocr_dpi: int = 300
     # Below this many extracted characters a page is treated as "needs OCR".
     ocr_text_threshold: int = 20
 
