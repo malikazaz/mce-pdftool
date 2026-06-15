@@ -6,11 +6,12 @@ A web tool that takes a legalised document set (an **original/English PDF** and 
 legalisation pages (solicitor, apostille) and the translator's notary stamp, in a fixed
 order, exported as a ZIP.
 
-It is **deterministic and manual**: a staff member labels every page by hand. There is **no
-AI, OCR, machine learning, or external/cloud document processing**. Uploaded files live only
-in a temporary per-project folder on the server, are never logged, never sent anywhere, and
-are deleteable on demand plus auto-cleaned after a configurable age — suitable for sensitive
-student documents.
+It is **deterministic**: pages are auto-suggested as academic/other by a rules engine (with
+local OCR), and a staff member confirms every label. There is **no AI, machine learning, or
+external/cloud document processing** — the only text extraction is local OCR (Tesseract) that
+runs on this server. Uploaded files live only in a temporary per-project folder, are never
+logged, never sent anywhere, and are deleteable on demand plus auto-cleaned after a
+configurable age — suitable for sensitive student documents.
 
 ## How the output is assembled
 
@@ -42,41 +43,89 @@ mce-pdftool/
   frontend/   React + TypeScript + Vite + PDF.js
 ```
 
-## Running locally
+## Running locally (Windows, step by step)
 
-### Backend
+You run TWO programs at the same time, each in its **own terminal window**:
+**Terminal 1 = backend**, **Terminal 2 = frontend**. Keep both open while using the tool.
 
-```bash
-cd backend
+Commands below are PowerShell. Do the steps in order, top to bottom.
+
+### Part A — Install the prerequisites (one time only)
+
+1. **Python 3.12+** — check with `python --version`. If missing: https://www.python.org/downloads/
+2. **Node.js 20+** — check with `node --version`. If missing: https://nodejs.org/
+3. **Tesseract OCR** (needed for the auto-recognition feature):
+   - Download and run the installer: https://github.com/UB-Mannheim/tesseract/wiki
+   - On the **"Additional language data"** screen, tick **Bulgarian** (English is always included).
+   - It installs to `C:\Program Files\Tesseract-OCR\`.
+4. **Close every terminal window** and open a fresh one (so it sees the newly installed tools).
+   Verify: `tesseract --version` prints a version number.
+   - If it says *"not found"*, that's fine — you'll handle it in Terminal 1, step 3 below.
+
+### Part B — First-time project setup (one time only)
+
+In **Terminal 1**:
+
+```powershell
+cd "c:\Users\ahmed azaz\mce-pdftool\backend"
 python -m venv .venv
-# Windows:  .venv\Scripts\activate     macOS/Linux:  source .venv/bin/activate
+.venv\Scripts\activate
 pip install -r requirements.txt
+```
+
+In **Terminal 2**:
+
+```powershell
+cd "c:\Users\ahmed azaz\mce-pdftool\frontend"
+npm install
+```
+
+### Part C — Start the app (every time you want to run it)
+
+**Terminal 1 — backend.** Run these four lines in this window, in order:
+
+```powershell
+cd "c:\Users\ahmed azaz\mce-pdftool\backend"
+.venv\Scripts\activate
+$env:MCE_TESSERACT_CMD = "C:\Program Files\Tesseract-OCR\tesseract.exe"
 uvicorn app.main:app --reload --port 8000
 ```
 
-API is served at `http://127.0.0.1:8000` (interactive docs at `/docs`).
+> The 3rd line tells the app where Tesseract is. You only need it if `tesseract --version`
+> failed in Part A step 4. If it worked, you can skip that line. Leave this window running.
 
-### Frontend
+**Terminal 2 — frontend.** Open a SECOND window and run:
 
-```bash
-cd frontend
-npm install
+```powershell
+cd "c:\Users\ahmed azaz\mce-pdftool\frontend"
 npm run dev
 ```
 
-Open `http://localhost:5173`. The Vite dev server proxies `/api` to the backend, so no
-extra configuration is needed.
+Leave this window running too.
 
-### Tests
+### Part D — Open it
 
-```bash
-cd backend
+Open **http://localhost:5173** in your browser. The frontend talks to the backend
+automatically. To stop the app, press `Ctrl+C` in each terminal.
+
+> **Not on Windows?** Backend activate: `source .venv/bin/activate`. Install Tesseract with
+> `sudo apt install tesseract-ocr tesseract-ocr-bul` (Linux) or
+> `brew install tesseract tesseract-lang` (macOS); it's normally on `PATH`, so the
+> `MCE_TESSERACT_CMD` line isn't needed.
+
+## Running the tests
+
+In **Terminal 1** (with the venv activated):
+
+```powershell
+cd "c:\Users\ahmed azaz\mce-pdftool\backend"
+.venv\Scripts\activate
 pytest
 ```
 
-The suite generates sample PDFs (with identifiable pages) and asserts the exact page order,
-counts, validation (non-PDF / out-of-range / sanitised filenames), and the full
-upload→generate→download API flow.
+The suite asserts the exact page order/counts, validation (non-PDF / out-of-range /
+sanitised filenames), the full upload→generate→download API flow, and the academic-page
+classifier (using the recognition guide's worked examples). It runs without Tesseract.
 
 ## Workflow
 
@@ -118,14 +167,7 @@ How it works (no AI, no external APIs — fully offline, GDPR-friendly for stude
 > from the recognition guide. Tune the English phrase lists as new document types appear, and
 > have a **native Bulgarian speaker review the lexicon** for production use.
 
-### Installing Tesseract (required for auto-recognition)
-
-- **Windows:** install the UB Mannheim build (`winget install UB-Mannheim.TesseractOCR`) or
-  from <https://github.com/UB-Mannheim/tesseract/wiki>, and add the **Bulgarian** language
-  pack during setup (English is included). If it isn't on `PATH`, set `MCE_TESSERACT_CMD`
-  (see config table) to e.g. `C:/Program Files/Tesseract-OCR/tesseract.exe`.
-- **Debian/Ubuntu:** `sudo apt install tesseract-ocr tesseract-ocr-bul`.
-- **macOS:** `brew install tesseract tesseract-lang`.
+(Tesseract installation is covered in "Running locally" → Part A.)
 
 ## Configuration
 
