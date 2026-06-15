@@ -23,6 +23,9 @@ export default function App() {
   const [suggestionMeta, setSuggestionMeta] = useState<SuggestionMeta>(emptyMeta());
   const [classifyState, setClassifyState] = useState<ClassifyState>("idle");
   const [classifyNote, setClassifyNote] = useState<string | null>(null);
+  const [classifyDone, setClassifyDone] = useState(false);
+  const [previewPhase, setPreviewPhase] = useState<"idle" | "preparing" | "ready">("idle");
+  const [thumbsLoaded, setThumbsLoaded] = useState(0);
   const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState<{ kind: Kind; page: number } | null>(null);
@@ -52,6 +55,7 @@ export default function App() {
     let cancelled = false;
     setClassifyState("running");
     setClassifyNote(null);
+    setClassifyDone(false);
     api
       .classify(projectId)
       .then((res) => {
@@ -59,6 +63,7 @@ export default function App() {
         if (!res.ocr_available) {
           setClassifyState("unavailable");
           setClassifyNote(res.note);
+          setClassifyDone(true);
           return;
         }
         // Merge suggestions over the legal-page defaults (suggestions never touch them).
@@ -76,16 +81,75 @@ export default function App() {
         }
         setSuggestionMeta(meta);
         setClassifyState("done");
+        setClassifyDone(true);
       })
       .catch((e) => {
         if (cancelled) return;
         setClassifyState("idle");
+        setClassifyDone(true); // let previews reveal; manual labelling still works
         setError((e as Error).message);
       });
     return () => {
       cancelled = true;
     };
   }, [projectId, pageCounts.original, pageCounts.translated]);
+
+  // Hold the previews until everything is ready: preload every page thumbnail (so the grid
+  // appears all at once instead of images popping in) while classification runs in parallel.
+  useEffect(() => {
+    if (!projectId || pageCounts.original === null || pageCounts.translated === null) return;
+    setPreviewPhase("preparing");
+    setThumbsLoaded(0);
+
+    const pages: { kind: Kind; page: number }[] = [];
+    for (let p = 1; p <= pageCounts.original; p++) pages.push({ kind: "original", page: p });
+    for (let p = 1; p <= pageCounts.translated; p++) pages.push({ kind: "translated", page: p });
+
+    let cancelled = false;
+    let loaded = 0;
+    const imgs: HTMLImageElement[] = [];
+    for (const { kind, page } of pages) {
+      const img = new Image();
+      const done = () => {
+        if (cancelled) return;
+        loaded += 1;
+        setThumbsLoaded(loaded);
+      };
+      img.onload = done;
+      img.onerror = done;
+      img.src = api.thumbnailUrl(projectId, kind, page);
+      imgs.push(img);
+    }
+    return () => {
+      cancelled = true;
+      for (const img of imgs) {
+        img.onload = null;
+        img.onerror = null;
+      }
+    };
+  }, [projectId, pageCounts.original, pageCounts.translated]);
+
+  const totalThumbs = (pageCounts.original ?? 0) + (pageCounts.translated ?? 0);
+  // Two phases: preview preload (fast, determinate %) then OCR/classification (variable —
+  // shown as an indeterminate spinner so the bar never looks "stuck").
+  const previewsLoading = totalThumbs === 0 || thumbsLoaded < totalThumbs;
+  const thumbPercent = totalThumbs === 0 ? 0 : Math.round((thumbsLoaded / totalThumbs) * 100);
+
+  // Reveal the grids once all thumbnails are in AND classification has settled.
+  useEffect(() => {
+    if (previewPhase !== "preparing") return;
+    if (totalThumbs > 0 && thumbsLoaded >= totalThumbs && classifyDone) {
+      setPreviewPhase("ready");
+    }
+  }, [previewPhase, thumbsLoaded, totalThumbs, classifyDone]);
+
+  // Pages the classifier flagged for human review (drives the strong red flag + the
+  // pre-generate safety gate).
+  const reviewPages = (["original", "translated"] as Kind[]).flatMap((kind) =>
+    Object.entries(suggestionMeta[kind])
+      .filter(([, info]) => info.needsReview)
+      .map(([page]) => ({ kind, page: Number(page) }))
+  );
 
   const handleRole = (kind: Kind, page: number, role: Role) => {
     setClassification((c) => ({
@@ -101,6 +165,17 @@ export default function App() {
     });
   };
 
+  // Clear a review flag without changing the label — for a page the team checked and the
+  // suggested label is correct (e.g. a translated page flagged only because it didn't line up
+  // positionally with the English side). Keeps the "auto" tag; clears the red flag and the gate.
+  const dismissReview = (kind: Kind, page: number) => {
+    setSuggestionMeta((m) => {
+      const info = m[kind][page];
+      if (!info || !info.needsReview) return m;
+      return { ...m, [kind]: { ...m[kind], [page]: { ...info, needsReview: false } } };
+    });
+  };
+
   const resetProject = async () => {
     setProjectId(null);
     setPageCounts({ original: null, translated: null });
@@ -108,6 +183,9 @@ export default function App() {
     setSuggestionMeta(emptyMeta());
     setClassifyState("idle");
     setClassifyNote(null);
+    setClassifyDone(false);
+    setPreviewPhase("idle");
+    setThumbsLoaded(0);
     setWarning(null);
     setResultKey((k) => k + 1);
     const p = await api.createProject();
@@ -134,7 +212,33 @@ export default function App() {
 
             {warning && <div className="warning">{warning}</div>}
 
-            {ready && (
+            {ready && previewPhase === "preparing" && (
+              <section className="panel">
+                <h2>Preparing previews…</h2>
+                <div className="prep-status">
+                  <span className="spinner" aria-hidden="true" />
+                  <span>
+                    {previewsLoading
+                      ? `Loading page previews… ${thumbPercent}%`
+                      : "Detecting academic documents… scanned pages take a little longer."}
+                  </span>
+                </div>
+                {previewsLoading ? (
+                  <div className="progress progress-lg">
+                    <div className="progress-bar" style={{ width: `${thumbPercent}%` }} />
+                  </div>
+                ) : (
+                  <div className="progress progress-lg indeterminate">
+                    <div className="progress-bar" />
+                  </div>
+                )}
+                <p className="muted" style={{ marginBottom: 0 }}>
+                  Everything will appear together once it's ready.
+                </p>
+              </section>
+            )}
+
+            {ready && previewPhase === "ready" && (
               <section className="panel">
                 <h2>2. Review page labels</h2>
                 <p className="muted" style={{ marginTop: 0 }}>
@@ -174,6 +278,7 @@ export default function App() {
                     classification={classification}
                     suggestionMeta={suggestionMeta}
                     onChange={handleRole}
+                    onDismiss={dismissReview}
                     onZoom={(kind, page) => setZoom({ kind, page })}
                   />
                   <PageGrid
@@ -183,6 +288,7 @@ export default function App() {
                     classification={classification}
                     suggestionMeta={suggestionMeta}
                     onChange={handleRole}
+                    onDismiss={dismissReview}
                     onZoom={(kind, page) => setZoom({ kind, page })}
                   />
                 </div>
@@ -193,7 +299,8 @@ export default function App() {
               key={resultKey}
               projectId={projectId}
               classification={classification}
-              ready={ready}
+              ready={ready && previewPhase === "ready"}
+              reviewPages={reviewPages}
               onCleared={resetProject}
               onError={setError}
             />

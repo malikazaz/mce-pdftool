@@ -9,6 +9,7 @@ interface Props {
   classification: Classification;
   suggestionMeta: SuggestionMeta;
   onChange: (kind: Kind, page: number, role: Role) => void;
+  onDismiss: (kind: Kind, page: number) => void;
   onZoom: (kind: Kind, page: number) => void;
 }
 
@@ -19,6 +20,7 @@ export default function PageGrid({
   classification,
   suggestionMeta,
   onChange,
+  onDismiss,
   onZoom,
 }: Props) {
   const title = kind === "original" ? "Original / English" : "Translated";
@@ -39,12 +41,25 @@ export default function PageGrid({
             <div
               className={`thumb${review ? " needs-review" : ""}`}
               key={page}
-              style={{ borderColor: review ? "#d97706" : meta.color }}
+              style={review ? undefined : { borderColor: meta.color }}
             >
+              {review && (
+                <div className="review-banner">
+                  <span>⚠ NEEDS REVIEW</span>
+                  <button
+                    type="button"
+                    className="dismiss-btn"
+                    onClick={() => onDismiss(kind, page)}
+                    title="Mark as checked — clears the review flag without changing the label"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
               <div className="thumb-head">
                 <span>Page {page}</span>
                 {suggestion ? (
-                  <span className={`suggested-tag${review ? "" : " auto"}`}>
+                  <span className={`suggested-tag${review ? " review" : " auto"}`}>
                     {review ? "review" : "auto"}
                   </span>
                 ) : (

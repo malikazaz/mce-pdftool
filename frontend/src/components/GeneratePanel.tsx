@@ -2,15 +2,19 @@ import { useMemo, useState } from "react";
 import { api } from "../api/client";
 import { ROLE_META } from "../roles";
 import { buildOrderPreview, buildPayload } from "../payload";
-import type { Classification, GenerateResponse, OutputSummary } from "../types/pdf";
+import type { Classification, GenerateResponse, Kind, OutputSummary } from "../types/pdf";
 
 interface Props {
   projectId: string;
   classification: Classification;
   ready: boolean; // both PDFs uploaded
+  reviewPages: { kind: Kind; page: number }[];
   onCleared: () => void;
   onError: (message: string) => void;
 }
+
+const pageLabel = (r: { kind: Kind; page: number }) =>
+  `${r.kind === "original" ? "Original" : "Translated"} p${r.page}`;
 
 function OrderPreview({
   title,
@@ -56,6 +60,7 @@ export default function GeneratePanel({
   projectId,
   classification,
   ready,
+  reviewPages,
   onCleared,
   onError,
 }: Props) {
@@ -64,6 +69,8 @@ export default function GeneratePanel({
   const [continuationLabel, setContinuationLabel] = useState("Continuation");
   const [result, setResult] = useState<GenerateResponse | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [ack, setAck] = useState(false);
 
   const labels = { diploma: diplomaLabel, continuation: continuationLabel };
   const payload = useMemo(
@@ -81,7 +88,15 @@ export default function GeneratePanel({
   if (continuationItems.length === 0)
     issues.push("Continuation has no pages selected.");
 
+  const hasFlagged = reviewPages.length > 0;
+
+  const openConfirm = () => {
+    setAck(false);
+    setShowConfirm(true);
+  };
+
   const generate = async () => {
+    setShowConfirm(false);
     setBusy(true);
     setResult(null);
     try {
@@ -163,7 +178,7 @@ export default function GeneratePanel({
         <button
           className="primary"
           disabled={!ready || issues.length > 0 || busy}
-          onClick={generate}
+          onClick={openConfirm}
         >
           {busy ? "Working…" : "Generate PDFs"}
         </button>
@@ -192,6 +207,61 @@ export default function GeneratePanel({
               {w}
             </div>
           ))}
+        </div>
+      )}
+
+      {showConfirm && (
+        <div className="modal-backdrop" onClick={() => setShowConfirm(false)}>
+          <div
+            className={`modal confirm-modal${hasFlagged ? " danger" : ""}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="confirm-head">
+              {hasFlagged ? "⚠ Pages still flagged for review" : "Generate documents?"}
+            </div>
+            <div className="confirm-body">
+              {hasFlagged ? (
+                <>
+                  <p style={{ marginTop: 0 }}>
+                    These documents are used for <strong>visa applications</strong> — an
+                    incorrect label can have serious consequences. The auto-detection flagged
+                    the following page(s) as needing a human check:
+                  </p>
+                  <div className="flagged-list">
+                    {reviewPages.map(pageLabel).join(", ")}
+                  </div>
+                  <label className="confirm-check">
+                    <input
+                      type="checkbox"
+                      checked={ack}
+                      onChange={(e) => setAck(e.target.checked)}
+                    />
+                    <span>
+                      I have reviewed the flagged page(s) above and confirm every label is
+                      correct.
+                    </span>
+                  </label>
+                </>
+              ) : (
+                <p style={{ marginTop: 0 }}>
+                  Generate the Diploma and Continuation PDFs for{" "}
+                  <strong>{clientName || "Client"}</strong>?
+                </p>
+              )}
+            </div>
+            <div className="confirm-actions">
+              <button className="secondary" onClick={() => setShowConfirm(false)}>
+                Cancel
+              </button>
+              <button
+                className="primary"
+                disabled={hasFlagged && !ack}
+                onClick={generate}
+              >
+                {hasFlagged ? "Confirm & generate" : "Generate"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </section>

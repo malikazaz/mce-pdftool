@@ -16,15 +16,17 @@ function Dropzone({
 }: {
   kind: Kind;
   pageCount: number | null;
-  onFile: (file: File) => void;
+  onFile: (file: File, onProgress: (percent: number) => void) => Promise<void>;
 }) {
   const [dragover, setDragover] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const handle = async (file: File | undefined) => {
     if (!file) return;
+    setProgress(0);
     setBusy(true);
-    await onFile(file);
+    await onFile(file, setProgress);
     setBusy(false);
   };
 
@@ -51,21 +53,32 @@ function Dropzone({
         style={{ display: "none" }}
         onChange={(e) => void handle(e.target.files?.[0])}
       />
-      <div className="meta">
-        {busy
-          ? "Uploading…"
-          : pageCount !== null
+      {busy ? (
+        <div className="upload-progress">
+          <div className="meta">Uploading… {progress}%</div>
+          <div className="progress">
+            <div className="progress-bar" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      ) : (
+        <div className="meta">
+          {pageCount !== null
             ? `Uploaded — ${pageCount} page(s). Click to replace.`
             : "Drag & drop or click to choose a PDF"}
-      </div>
+        </div>
+      )}
     </label>
   );
 }
 
 export default function UploadPanel({ projectId, pageCounts, onUploaded, onError }: Props) {
-  const upload = async (kind: Kind, file: File) => {
+  const upload = async (
+    kind: Kind,
+    file: File,
+    onProgress: (percent: number) => void
+  ) => {
     try {
-      const res = await api.upload(projectId, kind, file);
+      const res = await api.upload(projectId, kind, file, onProgress);
       onUploaded(kind, res.page_count, res.warning);
     } catch (e) {
       onError((e as Error).message);
@@ -79,12 +92,12 @@ export default function UploadPanel({ projectId, pageCounts, onUploaded, onError
         <Dropzone
           kind="original"
           pageCount={pageCounts.original}
-          onFile={(f) => upload("original", f)}
+          onFile={(f, onProgress) => upload("original", f, onProgress)}
         />
         <Dropzone
           kind="translated"
           pageCount={pageCounts.translated}
-          onFile={(f) => upload("translated", f)}
+          onFile={(f, onProgress) => upload("translated", f, onProgress)}
         />
       </div>
     </section>
