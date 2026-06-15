@@ -14,7 +14,27 @@ from pathlib import Path
 import pytest
 from pypdf import PdfReader
 from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
+
+# reportlab's built-in Helvetica is Latin-1 only and cannot embed Cyrillic. Register a
+# Unicode TTF so Bulgarian test text survives into the PDF text layer (needed for the
+# direct Bulgarian classification tests). Falls back to Helvetica if none is found.
+_UNICODE_FONT = "Helvetica"
+for _candidate in (
+    r"C:\Windows\Fonts\arial.ttf",
+    r"C:\Windows\Fonts\segoeui.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/Library/Fonts/Arial Unicode.ttf",
+):
+    if os.path.exists(_candidate):
+        try:
+            pdfmetrics.registerFont(TTFont("UnicodeTest", _candidate))
+            _UNICODE_FONT = "UnicodeTest"
+            break
+        except Exception:
+            pass
 
 
 def make_pdf(path: Path, markers: list[str]) -> None:
@@ -39,7 +59,7 @@ def make_text_pdf(path: Path, pages: list[str]) -> None:
     (no OCR required in tests)."""
     c = canvas.Canvas(str(path), pagesize=A4)
     for body in pages:
-        c.setFont("Helvetica", 12)
+        c.setFont(_UNICODE_FONT, 12)
         y = 760
         for line in body.split("\n"):
             words, current = line.split(" "), ""

@@ -103,6 +103,34 @@ def test_certified_translation_of_certificate_stays_academic():
     assert v.label == "academic"
 
 
+# --- Direct Bulgarian classification (translated side) ---
+
+def test_bg_certificate_is_academic_directly():
+    # A Bulgarian GCE translation: Bulgarian title + Latin awarding body + subject code/grade.
+    text = (
+        "AQA Общ сертификат за образование. ALTRINCHAM GRAMMAR SCHOOL FOR BOYS. "
+        "БИОЛОГИЯ (601/4625/4) Оценка B (b)"
+    )
+    v = classify_text(text)
+    assert v.label == "academic" and v.decisive
+
+
+def test_bg_school_letter_is_other_directly():
+    text = (
+        "До всички заинтересовани. Уважаеми господине/госпожо, пиша Ви, за да потвърдя. "
+        "С уважение, Директор."
+    )
+    v = classify_text(text)
+    assert v.label == "other" and v.decisive
+
+
+def test_bg_power_of_attorney_is_other_directly():
+    v = classify_text(
+        "ПЪЛНОМОЩНО НАЗНАЧАВА удостоверение за приравняване на дипломата за средно образование"
+    )
+    assert v.label == "other" and v.decisive
+
+
 # --- Bulgarian cross-check ---
 
 def test_bg_crosscheck_detects_academic():

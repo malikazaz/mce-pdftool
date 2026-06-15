@@ -61,14 +61,20 @@ def _embedded_text(page: "fitz.Page") -> str:
 
 
 def _ocr_page(page: "fitz.Page", lang: str) -> str:
-    """Render the page to an image and OCR it. Returns "" if OCR is unavailable."""
+    """Render the page to an image and OCR it. Returns "" if OCR is unavailable.
+
+    ``lang`` may be a Tesseract combo like "bul+eng"; unavailable packs are dropped and we
+    fall back to English so a missing Bulgarian pack never breaks classification.
+    """
     if not tesseract_available():
         return ""
-    # Fall back to English if the requested language pack isn't installed.
     langs = languages_available()
-    use_lang = lang if lang in langs else ("eng" if "eng" in langs else None)
-    if use_lang is None:
+    requested = [code for code in lang.split("+") if code in langs]
+    if not requested:
+        requested = ["eng"] if "eng" in langs else []
+    if not requested:
         return ""
+    use_lang = "+".join(requested)
     try:
         dpi = get_settings().ocr_dpi
         pix = page.get_pixmap(matrix=fitz.Matrix(dpi / 72, dpi / 72))

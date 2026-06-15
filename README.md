@@ -156,10 +156,13 @@ How it works (no AI, no external APIs — fully offline, GDPR-friendly for stude
   pages. The rules are a direct encoding of the internal recognition guidance
   (`RECOGNISING-ACADEMIC-DOCUMENTS.md`, kept out of this repo); every `academic` verdict
   records the signals behind it for auditability.
-- The **Bulgarian (translated) side is mirrored by document position** from the English
-  result (the translator preserves order), then **cross-checked offline** with Tesseract's
-  Bulgarian model + a bilingual lexicon. Pages where the mirror drifts or the cross-check
-  disagrees are flagged "review". No machine translation, no API.
+- The **Bulgarian (translated) side is classified directly** by the same bilingual rules:
+  Bulgarian titles/award-language plus the language-invariant signals the translations keep
+  (awarding bodies like AQA/WJEC, subject codes such as `601/4625/4`, candidate numbers,
+  grades). The English page in the same position is used only as a **cross-check** — where
+  the two sides disagree, or the page counts don't line up (e.g. a translation that expands
+  to two pages, or an untranslated passport), the page is flagged "review". No machine
+  translation, no API.
 - **Graceful degradation:** if Tesseract is not installed, the tool reports that
   auto-labelling is unavailable and manual labelling works exactly as before.
 

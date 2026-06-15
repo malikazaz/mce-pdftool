@@ -83,6 +83,8 @@ AWARD_LANGUAGE: list[str] = [
 ]
 
 # Regex sources (compiled in the service). Subject–grade structure & candidate identifiers.
+# Several are LANGUAGE-INVARIANT (subject codes, candidate numbers), so they fire on the
+# Bulgarian translations too — which is what makes direct Bulgarian classification reliable.
 SUBJECT_GRADE_REGEXES: list[str] = [
     # e.g. "Biology: A*", "Mathematics  A", "Chemistry - B"
     r"\b(biology|chemistry|physics|mathematics|maths|english|history|geography|"
@@ -92,6 +94,11 @@ SUBJECT_GRADE_REGEXES: list[str] = [
     r"\bcentre (number|no\.?)\b",
     r"\b(uci|uln)\b",
     r"\bgrade\b[^\n]{0,10}\b(a\*|[a-eu])\b",
+    # Awarding-body subject code, e.g. "601/4625/4", "603/0859/X" — same in both languages.
+    r"\b\d{3}/\d{4}/[0-9xх]\b",
+    # Bulgarian: "Оценка B (b)", "ОЦЕНКА 8 (осем)" and candidate/centre number labels.
+    r"\bоценка\b",
+    r"\b(номер на кандидата|№ на кандидата|номер на центъра|№ на центъра)\b",
 ]
 
 # --- "Other" signals ---
@@ -149,10 +156,43 @@ LEGALISATION_SIGNALS: list[str] = [
     "consular",
 ]
 
-# --- Bulgarian cross-check lexicon (offline verification only, guide §3.4 / §6.4) ---
-# Academic terms as they typically appear in Bulgarian certified translations. Awarding-body
-# names and candidate numbers usually remain in Latin/numeric form, which also helps.
+# --- Bulgarian classification phrases (the translated documents are in Bulgarian) ---
+# These let the Bulgarian side be classified DIRECTLY (not just mirrored). Combined with the
+# language-invariant signals above (awarding bodies in Latin, subject codes, candidate
+# numbers), they give the translated pages strong, self-contained signals.
 # NOTE: starter set — should be reviewed by a native Bulgarian speaker (see README).
+
+# Academic titles a Bulgarian translation may carry (guide §5.1 equivalents).
+BG_ACADEMIC_TITLES: list[str] = [
+    "диплома",                          # diploma (also matches "дипломата")
+    "академична справка",               # academic transcript
+    "свидетелство за",                  # certificate of …
+    "общ сертификат",                   # General Certificate (of [Secondary] Education)
+    "сертификат за образование",        # certificate of education
+    "сертификат за средно образование",  # certificate of secondary education
+    "атестат",                          # secondary-school leaving certificate
+]
+
+# Award language (guide §5.1 equivalents).
+BG_AWARD_LANGUAGE: list[str] = [
+    "с настоящото се удостоверява",     # this is to certify
+    "удостоверява се, че",              # it is certified that
+    "постигна следния резултат",        # achieved the following result
+    "постигна следните резултати",      # achieved the following results
+    "постигна два резултата",           # achieved two results
+]
+
+# Letter structure (guide §5.2 equivalents) — push to other.
+BG_LETTER_SIGNALS: list[str] = [
+    "до всички заинтересовани",         # to whom it may concern
+    "уважаеми господине",               # dear sir
+    "уважаема госпожо",                 # dear madam
+    "уважаеми господине/госпожо",       # dear sir/madam
+    "с уважение",                       # yours sincerely / faithfully
+    "на вниманието на",                 # for the attention of
+]
+
+# Academic lexicon used by the (secondary) cross-check helper.
 BG_ACADEMIC_LEXICON: list[str] = [
     "диплома",          # diploma
     "свидетелство",     # certificate

@@ -45,16 +45,21 @@ class PageVerdict:
 
 
 def classify_text(text: str) -> PageVerdict:
-    """Classify a single page's text as academic/other (English/Latin script)."""
+    """Classify a single page's text as academic/other.
+
+    Bilingual: English and Bulgarian phrase lists are checked together, so the same function
+    works on either side. Awarding bodies, subject codes and candidate numbers are
+    language-invariant and fire on both English originals and Bulgarian translations.
+    """
     t = _norm(text)
 
-    title_hits = _hits(t, rules.ACADEMIC_TITLE_PHRASES)
+    title_hits = _hits(t, rules.ACADEMIC_TITLE_PHRASES + rules.BG_ACADEMIC_TITLES)
     body_hits = _hits(t, rules.AWARDING_BODIES)
-    award_hits = _hits(t, rules.AWARD_LANGUAGE)
+    award_hits = _hits(t, rules.AWARD_LANGUAGE + rules.BG_AWARD_LANGUAGE)
     grade_hits = [r.pattern[:24] + "…" for r in _SUBJECT_GRADE_RE if r.search(t)]
-    letter_hits = _hits(t, rules.LETTER_SIGNALS)
-    legal_hits = _hits(t, rules.LEGALISATION_SIGNALS)
-    doctype_hits = _hits(t, rules.OTHER_DOCUMENT_TYPES) + [
+    letter_hits = _hits(t, rules.LETTER_SIGNALS + rules.BG_LETTER_SIGNALS)
+    legal_hits = _hits(t, rules.LEGALISATION_SIGNALS + rules.BG_LEGALISATION_LEXICON)
+    doctype_hits = _hits(t, rules.OTHER_DOCUMENT_TYPES + rules.BG_OTHER_DOCTYPES) + [
         "passport-mrz" for r in _OTHER_DOCTYPE_RE if r.search(t)
     ]
 
@@ -153,58 +158,66 @@ def _doc_region(kind: str, page_count: int) -> list[int]:
     return [p for p in range(3, page_count)]  # drop the last (notary) page too
 
 
+def _verdict_needs_review(v: PageVerdict) -> bool:
+    return (not v.decisive) or (v.label == "academic" and v.confidence < SOLID_CONFIDENCE)
+
+
 def classify_project(
     original_path: str,
     translated_path: str,
     original_count: int,
     translated_count: int,
 ) -> list[PageSuggestion]:
-    """Classify English doc pages, mirror onto the translated side, cross-check in Bulgarian."""
+    """Classify each side's document pages directly; use the English↔Bulgarian positional
+    mirror only as a cross-check that flags disagreements for human review.
+
+    Classifying the Bulgarian pages on their own merits (Bulgarian titles + language-invariant
+    awarding bodies / subject codes / grades) avoids relying on the two PDFs staying
+    positionally aligned — which they don't when a translation expands pages or a document is
+    not translated (e.g. a passport).
+    """
     orig_region = _doc_region("original", original_count)
     trans_region = _doc_region("translated", translated_count)
 
-    # 1. Classify the English/original document pages directly.
     orig_verdicts: dict[int, PageVerdict] = {
         p: classify_text(ocr_service.extract_page_text(original_path, p, "eng"))
         for p in orig_region
     }
+    trans_verdicts: dict[int, PageVerdict] = {
+        p: classify_text(ocr_service.extract_page_text(translated_path, p, "bul+eng"))
+        for p in trans_region
+    }
 
     suggestions: list[PageSuggestion] = []
+
+    # English / original side.
     for p in orig_region:
         v = orig_verdicts[p]
-        needs_review = (not v.decisive) or (
-            v.label == "academic" and v.confidence < SOLID_CONFIDENCE
-        )
         suggestions.append(
-            PageSuggestion("original", p, v.label, v.confidence, needs_review, v.signals)
+            PageSuggestion(
+                "original", p, v.label, v.confidence, _verdict_needs_review(v), v.signals
+            )
         )
 
-    # 2. Mirror onto the translated side by document position.
+    # Bulgarian / translated side — direct classification, mirror as a sanity cross-check.
     aligned = len(orig_region) == len(trans_region)
     for i, p in enumerate(trans_region):
-        if i < len(orig_region):
-            mirrored = orig_verdicts[orig_region[i]]
-            label = mirrored.label
-            confidence = mirrored.confidence
-            signals = [f"mirrored:{s}" for s in mirrored.signals]
-            review = (not aligned) or (not mirrored.decisive)
-        else:
-            # Drift: more translated doc pages than English ones.
-            label, confidence, signals, review = "other", 0.4, [], True
+        v = trans_verdicts[p]
+        review = _verdict_needs_review(v)
+        signals = list(v.signals)
 
-        # 3. Offline Bulgarian cross-check.
-        cc = bg_crosscheck(ocr_service.extract_page_text(translated_path, p, "bul"))
-        if cc is True:
-            signals.append("bg:academic")
-            if label != "academic":
-                review = True  # Bulgarian looks academic but mirror said other
-        elif cc is False:
-            signals.append("bg:non-academic")
-            if label == "academic":
-                review = True  # Bulgarian looks non-academic but mirror said academic
+        if not aligned:
+            # Page counts differ -> we can't trust positional comparison; ask for a look.
+            review = True
+            signals.append("structure:unaligned-with-english")
+        elif i < len(orig_region):
+            english_label = orig_verdicts[orig_region[i]].label
+            if english_label != v.label:
+                review = True
+                signals.append(f"disagrees-with-english:{english_label}")
 
         suggestions.append(
-            PageSuggestion("translated", p, label, confidence, review, signals)
+            PageSuggestion("translated", p, v.label, v.confidence, review, signals)
         )
 
     return suggestions
