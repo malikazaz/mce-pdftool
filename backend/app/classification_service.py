@@ -14,11 +14,14 @@ Design choices that follow the guide:
 
 from __future__ import annotations
 
+import os
 import re
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
 from . import classification_rules as rules
 from . import ocr_service
+from .config import get_settings
 
 # Confidence at/above which an academic suggestion is considered solid (no auto-review flag).
 SOLID_CONFIDENCE = 0.75
@@ -179,13 +182,34 @@ def classify_project(
     orig_region = _doc_region("original", original_count)
     trans_region = _doc_region("translated", translated_count)
 
-    orig_verdicts: dict[int, PageVerdict] = {
-        p: classify_text(ocr_service.extract_page_text(original_path, p, "eng"))
-        for p in orig_region
-    }
+    # OCR is the dominant cost and each page is independent. pytesseract shells out to the
+    # Tesseract binary (separate process per call), and ocr_service opens its own PDF handle
+    # per page, so the work parallelises cleanly across threads — near-linear speedup with
+    # cores on a multi-page set. Worker count is configurable (MCE_OCR_WORKERS); 0 = auto.
+    tasks: list[tuple[str, int, str, str]] = (
+        [("original", p, original_path, "eng") for p in orig_region]
+        + [("translated", p, translated_path, "bul+eng") for p in trans_region]
+    )
+
+    def _verdict_for(path: str, page: int, lang: str) -> PageVerdict:
+        return classify_text(ocr_service.extract_page_text(path, page, lang))
+
+    results: dict[tuple[str, int], PageVerdict] = {}
+    if tasks:
+        configured = get_settings().ocr_workers
+        workers = configured if configured > 0 else min(8, (os.cpu_count() or 2))
+        workers = max(1, min(workers, len(tasks)))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {
+                pool.submit(_verdict_for, path, page, lang): (kind, page)
+                for (kind, page, path, lang) in tasks
+            }
+            for future, (kind, page) in futures.items():
+                results[(kind, page)] = future.result()
+
+    orig_verdicts: dict[int, PageVerdict] = {p: results[("original", p)] for p in orig_region}
     trans_verdicts: dict[int, PageVerdict] = {
-        p: classify_text(ocr_service.extract_page_text(translated_path, p, "bul+eng"))
-        for p in trans_region
+        p: results[("translated", p)] for p in trans_region
     }
 
     suggestions: list[PageSuggestion] = []

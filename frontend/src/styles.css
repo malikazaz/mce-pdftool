@@ -568,3 +568,26 @@ button:disabled {
   color: var(--muted);
   font-size: 13px;
 }
+
+/* TEMP DIAGNOSTIC (remove later): floating analysis/generate timer. */
+.diag-box {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 60;
+  background: rgba(17, 24, 39, 0.9);
+  color: #e5e7eb;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 8px 12px;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+.diag-box strong {
+  display: block;
+  color: #fff;
+  font-weight: 700;
+  margin-bottom: 2px;
+}

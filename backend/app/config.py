@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     ocr_dpi: int = 300
     # Below this many extracted characters a page is treated as "needs OCR".
     ocr_text_threshold: int = 20
+    # Parallel OCR workers for page classification. 0 = auto (min(8, CPU count)). Each worker
+    # runs a separate Tesseract process, so this scales nearly linearly with cores. Lower it
+    # on memory-constrained hosts (e.g. 1–2); raise it on a beefy server.
+    ocr_workers: int = 0
 
     # CORS origins allowed to call the API (the Vite dev server by default).
     allowed_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]

@@ -9,6 +9,7 @@ interface Props {
   classification: Classification;
   ready: boolean; // both PDFs uploaded
   reviewPages: { kind: Kind; page: number }[];
+  onGenerated?: (ms: number) => void; // TEMP DIAGNOSTIC: report generate duration
   onCleared: () => void;
   onError: (message: string) => void;
 }
@@ -61,6 +62,7 @@ export default function GeneratePanel({
   classification,
   ready,
   reviewPages,
+  onGenerated,
   onCleared,
   onError,
 }: Props) {
@@ -71,6 +73,9 @@ export default function GeneratePanel({
   const [busy, setBusy] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [ack, setAck] = useState(false);
+  // GOOGLE-DRIVE: state for the Save to Google Drive action (endpoint is a stub for now).
+  const [driveBusy, setDriveBusy] = useState(false);
+  const [driveMsg, setDriveMsg] = useState<string | null>(null);
 
   const labels = { diploma: diplomaLabel, continuation: continuationLabel };
   const payload = useMemo(
@@ -100,12 +105,29 @@ export default function GeneratePanel({
     setBusy(true);
     setResult(null);
     try {
+      const t0 = performance.now(); // TEMP DIAGNOSTIC
       const res = await api.generate(projectId, buildPayload(classification, clientName.trim(), labels));
+      onGenerated?.(performance.now() - t0); // TEMP DIAGNOSTIC
       setResult(res);
     } catch (e) {
       onError((e as Error).message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  // GOOGLE-DRIVE: call the (stub) backend endpoint. Once implemented it should report the
+  // saved file link(s); for now it surfaces the backend's "not configured" message.
+  const saveToDrive = async () => {
+    setDriveBusy(true);
+    setDriveMsg(null);
+    try {
+      const res = await api.saveToDrive(projectId);
+      setDriveMsg(res.message ?? "Saved to Google Drive.");
+    } catch (e) {
+      setDriveMsg((e as Error).message);
+    } finally {
+      setDriveBusy(false);
     }
   };
 
@@ -187,10 +209,18 @@ export default function GeneratePanel({
             <button className="secondary">Download ZIP</button>
           </a>
         )}
+        {/* GOOGLE-DRIVE: saves the generated outputs straight to Drive (backend stub for now). */}
+        {result && (
+          <button className="secondary" onClick={saveToDrive} disabled={driveBusy}>
+            {driveBusy ? "Saving…" : "Save to Google Drive"}
+          </button>
+        )}
         <button className="danger" disabled={busy} onClick={clear} style={{ marginLeft: "auto" }}>
           Clear project
         </button>
       </div>
+
+      {driveMsg && <div className="info">{driveMsg}</div>}
 
       {result && (
         <div style={{ marginTop: 12 }}>

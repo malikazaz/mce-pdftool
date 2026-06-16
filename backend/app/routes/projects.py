@@ -304,6 +304,59 @@ def download(project_id: str) -> FileResponse:
     )
 
 
+@router.post("/{project_id}/save-to-drive")
+def save_to_drive(project_id: str) -> Response:
+    """Upload the generated outputs straight to Google Drive.
+
+    GOOGLE-DRIVE: this is an intentional STUB — the integration is left empty for the
+    developer to fill in. Everything around it (project lookup, locating the generated files,
+    the frontend button that calls this) is wired; only the Drive upload itself is missing.
+
+    The files to upload already exist on disk after ``generate`` runs, for this project:
+      • the two final PDFs (Diploma + Continuation):  <project_dir>/outputs/*.pdf
+      • a single ZIP containing both:                 <project_dir>/output.zip
+    (``output_files`` and ``zip_path`` below point at exactly these.)
+
+    Suggested implementation:
+      1. Credentials — a Google **service account** (best for server-to-server) or OAuth2 user
+         creds. Read the creds path + target folder from config/env (e.g. MCE_GDRIVE_CREDENTIALS,
+         MCE_GDRIVE_FOLDER_ID). Never hard-code secrets. Add `google-api-python-client` (and
+         `google-auth`) to backend/requirements.txt.
+      2. Build the client: ``build("drive", "v3", credentials=creds)``.
+      3. Upload each file: ``drive.files().create(body={"name": name, "parents": [folder_id]},
+         media_body=MediaFileUpload(str(path), resumable=True)).execute()``.
+      4. Return the created file IDs / ``webViewLink``s so the UI can deep-link to them.
+
+    PORTAL-AUTH: gate behind the portal's auth dependency like the other routes.
+    """
+    _require_project(project_id)
+
+    outputs_dir = storage_service.safe_join(
+        storage_service.project_dir(project_id), "outputs"
+    )
+    zip_path = storage_service.safe_join(
+        storage_service.project_dir(project_id), "output.zip"
+    )
+    output_files = sorted(outputs_dir.glob("*.pdf"))
+    if not output_files or not zip_path.exists():
+        raise HTTPException(
+            status_code=409, detail="Generate the documents before saving to Google Drive."
+        )
+
+    # ----------------------------------------------------------------------------------------
+    # GOOGLE-DRIVE INTEGRATION GOES HERE.
+    # Upload `output_files` (the two PDFs) and/or `zip_path` to the target Drive folder, then
+    # return the created links, e.g.:
+    #     return JSONResponse({"files": [{"name": ..., "link": ...}, ...]})
+    # ----------------------------------------------------------------------------------------
+
+    raise HTTPException(
+        status_code=501,
+        detail="Save to Google Drive isn't configured yet — the backend endpoint is a stub "
+        "(backend/app/routes/projects.py → save_to_drive).",
+    )
+
+
 @router.delete("/{project_id}", status_code=204)
 def delete_project(project_id: str) -> Response:
     _require_project(project_id)

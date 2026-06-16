@@ -94,6 +94,14 @@ export const api = {
     return `${BASE}/${projectId}/download`;
   },
 
+  // GOOGLE-DRIVE: triggers the backend save-to-drive endpoint (currently a stub). Once the
+  // developer wires the Drive upload, this should resolve with the created file link(s).
+  async saveToDrive(
+    projectId: string
+  ): Promise<{ message?: string; files?: { name: string; link: string }[] }> {
+    return asJson(await fetch(`${BASE}/${projectId}/save-to-drive`, { method: "POST" }));
+  },
+
   async deleteProject(projectId: string): Promise<void> {
     const res = await fetch(`${BASE}/${projectId}`, { method: "DELETE" });
     if (!res.ok && res.status !== 404) throw new Error("Failed to delete project.");

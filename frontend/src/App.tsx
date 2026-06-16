@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "./api/client";
 import UploadPanel from "./components/UploadPanel";
 import PageGrid from "./components/PageGrid";
@@ -29,6 +29,12 @@ export default function App() {
   const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState<{ kind: Kind; page: number } | null>(null);
+
+  // TEMP DIAGNOSTIC (remove later): time the analysis (upload-complete → previews ready)
+  // and the generate step.
+  const analysisStartRef = useRef<number | null>(null);
+  const [analysisMs, setAnalysisMs] = useState<number | null>(null);
+  const [generateMs, setGenerateMs] = useState<number | null>(null);
 
   // Create a project on first load.
   useEffect(() => {
@@ -100,6 +106,8 @@ export default function App() {
     if (!projectId || pageCounts.original === null || pageCounts.translated === null) return;
     setPreviewPhase("preparing");
     setThumbsLoaded(0);
+    analysisStartRef.current = performance.now(); // TEMP DIAGNOSTIC
+    setAnalysisMs(null); // TEMP DIAGNOSTIC
 
     const pages: { kind: Kind; page: number }[] = [];
     for (let p = 1; p <= pageCounts.original; p++) pages.push({ kind: "original", page: p });
@@ -140,6 +148,10 @@ export default function App() {
     if (previewPhase !== "preparing") return;
     if (totalThumbs > 0 && thumbsLoaded >= totalThumbs && classifyDone) {
       setPreviewPhase("ready");
+      // TEMP DIAGNOSTIC: record how long the full analysis took.
+      if (analysisStartRef.current != null) {
+        setAnalysisMs(performance.now() - analysisStartRef.current);
+      }
     }
   }, [previewPhase, thumbsLoaded, totalThumbs, classifyDone]);
 
@@ -186,6 +198,9 @@ export default function App() {
     setClassifyDone(false);
     setPreviewPhase("idle");
     setThumbsLoaded(0);
+    analysisStartRef.current = null; // TEMP DIAGNOSTIC
+    setAnalysisMs(null); // TEMP DIAGNOSTIC
+    setGenerateMs(null); // TEMP DIAGNOSTIC
     setWarning(null);
     setResultKey((k) => k + 1);
     const p = await api.createProject();
@@ -301,6 +316,7 @@ export default function App() {
               classification={classification}
               ready={ready && previewPhase === "ready"}
               reviewPages={reviewPages}
+              onGenerated={setGenerateMs}
               onCleared={resetProject}
               onError={setError}
             />
@@ -316,6 +332,22 @@ export default function App() {
           onClose={() => setZoom(null)}
         />
       )}
+
+      {/* TEMP DIAGNOSTIC (remove later): analysis + generate timings. */}
+      <div className="diag-box">
+        <strong>⏱ Diagnostics (temp)</strong>
+        <div>
+          Analysis:{" "}
+          {previewPhase === "preparing"
+            ? "running…"
+            : analysisMs == null
+              ? "—"
+              : `${(analysisMs / 1000).toFixed(1)}s`}
+        </div>
+        <div>
+          Generate: {generateMs == null ? "—" : `${(generateMs / 1000).toFixed(1)}s`}
+        </div>
+      </div>
     </>
   );
 }

@@ -225,6 +225,7 @@ Settings are environment-overridable with the `MCE_` prefix (see `backend/app/co
 | `MCE_TESSERACT_CMD` | _(empty)_ | Explicit path to the Tesseract binary (else use `PATH`) |
 | `MCE_OCR_DPI` | `300` | Render DPI when OCR'ing a scanned page (higher = better on faint scans, slower) |
 | `MCE_OCR_TEXT_THRESHOLD` | `20` | Below this many embedded chars, a page is OCR'd |
+| `MCE_OCR_WORKERS` | `0` | Parallel OCR workers (0 = auto: min(8, CPU count)); lower on small hosts |
 | `MCE_ALLOWED_ORIGINS` | localhost:5173 | CORS origins (JSON list) |
 
 ## Privacy & security
