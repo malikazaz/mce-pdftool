@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     tesseract_cmd: str = ""
     # DPI used when rendering a page to an image for OCR. Higher = slower, more accurate.
     # 300 reads faint/low-contrast certificate scans far better than 200, at a modest cost.
-    ocr_dpi: int = 300
+    ocr_dpi: int = 150
     # Below this many extracted characters a page is treated as "needs OCR".
     ocr_text_threshold: int = 20
     # Parallel OCR workers for page classification. 0 = auto (min(8, CPU count)). Each worker

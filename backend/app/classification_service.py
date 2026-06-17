@@ -19,9 +19,12 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
+import fitz
+
 from . import classification_rules as rules
 from . import ocr_service
 from .config import get_settings
+from .ocr_service import _ocr_page_fast, _ocr_page_full
 
 # Confidence at/above which an academic suggestion is considered solid (no auto-review flag).
 SOLID_CONFIDENCE = 0.75
@@ -191,9 +194,38 @@ def classify_project(
         + [("translated", p, translated_path, "bul+eng") for p in trans_region]
     )
 
-    def _verdict_for(path: str, page: int, lang: str) -> PageVerdict:
-        return classify_text(ocr_service.extract_page_text(path, page, lang))
+    def _verdict_for(path: str, page_num: int, lang: str) -> PageVerdict:
+        doc = fitz.open(str(path))
 
+        try:
+            page = doc.load_page(page_num - 1)
+
+            embedded = ocr_service.embedded_text(page)
+
+            if len(embedded) >= get_settings().ocr_text_threshold:
+                verdict = classify_text(embedded)
+                return verdict
+
+            embedded = ocr_service.embedded_text(page)
+
+            if len(embedded) >= get_settings().ocr_text_threshold:
+                verdict = classify_text(embedded)
+                return verdict
+
+            fast_text = ocr_service.ocr_page_fast(page, lang)
+
+            verdict = classify_text(fast_text)
+
+            if verdict.confidence >= 0.75:
+                return verdict
+
+            full_text = ocr_service.ocr_page_full(page, lang)
+
+            verdict = classify_text(full_text)
+            return verdict
+
+        finally:
+            doc.close()
     results: dict[tuple[str, int], PageVerdict] = {}
     if tasks:
         configured = get_settings().ocr_workers
@@ -245,3 +277,21 @@ def classify_project(
         )
 
     return suggestions
+
+
+def classify_page(
+    page: fitz.Page,
+    lang: str,
+) -> PageVerdict:
+    fast_text = _ocr_page_fast(page, lang)
+
+    verdict = classify_text(fast_text)
+
+    if verdict.confidence >= 0.75:
+        return verdict
+
+    full_text = _ocr_page_full(page, lang)
+
+    verdict = classify_text(full_text)
+
+    return verdict
